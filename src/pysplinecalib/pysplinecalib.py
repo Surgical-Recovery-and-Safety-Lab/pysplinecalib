@@ -245,7 +245,7 @@ class SplineCalib(object):
             self.knot_vec_tr = np.unique(self.knot_vec_tr)
             self.knot_vec_tr = np.log(self.knot_vec_tr/(1-self.knot_vec_tr))
 
-            y_model_tr = np.clip(y_model, self.logodds_eps, 1-self.logodds_eps, y_model)
+            y_model_tr = np.clip(y_model, self.logodds_eps, 1-self.logodds_eps)
             y_model_tr = np.log(y_model_tr/(1-y_model_tr))
         else:
             y_model_tr = y_model
