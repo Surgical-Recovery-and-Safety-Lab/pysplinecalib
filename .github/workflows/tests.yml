@@ -1,0 +1,44 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  pytest:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: pytest --cov=pysplinecalib --cov-report=term-missing
+        env:
+          MPLBACKEND: Agg
+
+  pytest-min-deps:
+    name: pytest (minimum dependency versions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - name: Install the lowest versions allowed by pyproject.toml
+        run: |
+          pip install -e ".[dev]"
+          pip install --force-reinstall --no-deps \
+            "numpy==2.1.0" "scipy==1.14.0" "matplotlib==3.9.0" \
+            "pandas==2.2.3" "scikit-learn==1.5.0" "pytest==8.0.0"
+      - run: pytest
+        env:
+          MPLBACKEND: Agg
