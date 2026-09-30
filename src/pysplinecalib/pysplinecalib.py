@@ -290,31 +290,19 @@ class SplineCalib(object):
 
         self.X_mat_used = X_mat
         # perform cross-validated logistic regression
-        if self.use_weights:
-            best_lam, ll_vec, reg = logreg_cv(
-                X_mat.astype(np.float64),
-                y_true.astype(np.float64),
-                self.cv_spline,
-                self.reg_param_vec,
-                weightvec=weightvec.astype(np.float64),
-                method=self.method,
-                max_iter=self.max_iter,
-                tol=self.tol,
-                reg_prec=self.reg_prec,
-                ps_mode=self.param_search_mode,
-            )
-        else:
-            best_lam, ll_vec, reg = logreg_cv(
-                X_mat.astype(np.float64),
-                y_true.astype(np.float64),
-                self.cv_spline,
-                self.reg_param_vec,
-                method=self.method,
-                max_iter=self.max_iter,
-                tol=self.tol,
-                reg_prec=self.reg_prec,
-                ps_mode=self.param_search_mode,
-            )
+        best_lam, ll_vec, reg = logreg_cv(
+            X_mat.astype(np.float64),
+            y_true.astype(np.float64),
+            self.cv_spline,
+            self.reg_param_vec,
+            weightvec=weightvec.astype(np.float64) if self.use_weights else None,
+            method=self.method,
+            max_iter=self.max_iter,
+            tol=self.tol,
+            random_state=self.random_state,
+            reg_prec=self.reg_prec,
+            ps_mode=self.param_search_mode,
+        )
         self.best_reg_param = best_lam
         self.reg_param_scores = ll_vec
         self.basis_coef_vec = reg.x
@@ -432,18 +420,19 @@ class SplineCalib(object):
             return None
 
     def _calibrate_binary(self, y_in: FloatArray) -> FloatArray:
-        if len(y_in.shape) == 2:
-            if y_in.shape[1] == 2:
-                y_in_to_use = y_in[:, 1]
-                two_col = True
-            elif y_in.shape[0] == 1:
-                y_in_to_use = y_in[:, 0]
-                two_col = False
-        elif len(y_in.shape) == 1:
+        two_col = False
+        if y_in.ndim == 1:
             y_in_to_use = y_in
-            two_col = False
+        elif y_in.ndim == 2 and y_in.shape[1] == 2:
+            y_in_to_use = y_in[:, 1]
+            two_col = True
+        elif y_in.ndim == 2 and y_in.shape[1] == 1:
+            y_in_to_use = y_in[:, 0]
         else:
-            warnings.warn("Unable to handle input of this shape")
+            raise ValueError(
+                "Binary calibration expects input of shape (n_samples,), "
+                f"(n_samples, 1) or (n_samples, 2), got {y_in.shape}."
+            )
 
         if self.logodds_scale:
             y_in_to_use = np.minimum(1 - self.logodds_eps, y_in_to_use)
@@ -454,8 +443,6 @@ class SplineCalib(object):
         basis_exp = _natural_cubic_spline_basis_expansion(y_model_tr, self.knot_vec_tr)
         y_out = basis_exp.dot(self.basis_coef_vec.T)
         y_out = 1 / (1 + np.exp(-y_out))
-        if len(y_out.shape) > 1:
-            y_out = y_out[:, 0]
         y_out = np.vstack((1 - y_out, y_out)).T if two_col else y_out
         return y_out
 
