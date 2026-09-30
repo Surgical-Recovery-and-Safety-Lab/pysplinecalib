@@ -1,6 +1,3 @@
-"""splinecalib is a Python package for Probability Calibration
-using smoothing splines."""
+"""pysplinecalib is a fork from the splinecalib package of Brian Lucena."""
 
-from .splinecalib import SplineCalib
-
-__version__ = '0.0.13'
+__version__ = "0.0.1"
