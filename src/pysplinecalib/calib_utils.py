@@ -3,36 +3,40 @@ from __future__ import division
 
 import numpy as np
 import scipy as sp
+import scipy.optimize  # noqa: F401
 import random
 import warnings
+from scipy.special import expit
 from scipy.stats import binom
-from loss_fun_c import pen_ll_fun, pen_ll_fun_grad
+
+from .loss_fun import pen_ll_fun_grad
 
 def _natural_cubic_spline_basis_expansion(xpts, knots):
-    """Does the natural cubis spline bases for a set of points and knots"""
-    num_knots = len(knots)
-    num_pts = len(xpts)
-    outmat = np.zeros((num_pts,num_knots))
-    outmat[:, 0] = np.ones(num_pts)
+    """Compute the natural cubic spline basis for points and knots.
+
+    Parameters
+    ----------
+    xpts : array-like of shape (n_points,)
+        Points at which to evaluate the basis.
+    knots : array-like of shape (n_knots,)
+        Sorted knot locations.
+
+    Returns
+    -------
+    outmat : ndarray of shape (n_points, n_knots)
+        Basis matrix: intercept, linear term, then n_knots - 2 nonlinear terms.
+    """
+    xpts = np.asarray(xpts, dtype=np.float64)
+    knots = np.asarray(knots, dtype=np.float64)
+    last = knots[-1]
+    tail = np.maximum(xpts - last, 0.0) ** 3
+    d = (np.maximum(xpts[:, None] - knots[None, :-1], 0.0) ** 3 - tail[:, None]) / (
+        last - knots[:-1]
+    )
+    outmat = np.empty((len(xpts), len(knots)))
+    outmat[:, 0] = 1.0
     outmat[:, 1] = xpts
-
-    def make_func_H(k):
-        def make_func_d(k):
-            def func_d(x):
-                denom = knots[-1] - knots[k-1]
-                numer = (np.maximum(x-knots[k-1], np.zeros(len(x))) ** 3 - 
-                        np.maximum(x-knots[-1], np.zeros(len(x))) ** 3)
-                return numer/denom
-            return func_d
-
-        def func_H(x):
-            d_fun_k = make_func_d(k)
-            d_fun_Km1 = make_func_d(num_knots-1)
-            return d_fun_k(x) -  d_fun_Km1(x)
-        return func_H
-    for i in range(1, num_knots-1):
-        curr_H_fun = make_func_H(i)
-        outmat[:, i+1] = curr_H_fun(xpts)
+    outmat[:, 2:] = d[:, :-1] - d[:, -1:]
     return outmat
 
 
@@ -47,58 +51,44 @@ def logreg_cv(X, y, num_folds, reg_param_vec, method, max_iter,
     preds = np.zeros(len(y))
     ll_vec = np.zeros(len(reg_param_vec))
     start_coef_vec = np.zeros(X.shape[1])
-    for i,lam_val in enumerate(reg_param_vec):
-        num_folds_to_search = 1 if ps_mode=='fast' else num_folds
-        for fn in range(num_folds_to_search):
-            X_tr = X[fn_vec!=fn,:]
-            y_tr = y[fn_vec!=fn]
-            X_te = X[fn_vec==fn,:]
-            if weightvec is not None:
-                weightvec_tr = weightvec[fn_vec!=fn]
-                opt_res = sp.optimize.minimize(pen_ll_fun_grad,
-                                               start_coef_vec,
-                                                (X_tr, y_tr,
-                                                 float(lam_val), weightvec_tr),
-                                                method=method,
-                                                jac=True,
-                                                options={"gtol": tol,
-                                                 "maxiter": max_iter})
-            else:
-                opt_res = sp.optimize.minimize(pen_ll_fun_grad,
-                                               start_coef_vec,
-                                                (X_tr, y_tr,
-                                                 float(lam_val)),
-                                                method=method,
-                                                jac=True,
-                                                options={"gtol": tol,
-                                                 "maxiter": max_iter})
-            coefs = opt_res.x
+    num_folds_to_search = 1 if ps_mode == 'fast' else num_folds
+
+    # Build the fold splits once, rather than for every lambda
+    splits = []
+    for fn in range(num_folds_to_search):
+        tr = fn_vec != fn
+        te = fn_vec == fn
+        splits.append((te, X[tr, :], y[tr], X[te, :],
+                       None if weightvec is None else weightvec[tr]))
+
+    for i, lam_val in enumerate(reg_param_vec):
+        for te, X_tr, y_tr, X_te, weightvec_tr in splits:
+            opt_res = sp.optimize.minimize(pen_ll_fun_grad,
+                                           start_coef_vec,
+                                           (X_tr, y_tr, float(lam_val),
+                                            weightvec_tr),
+                                           method=method,
+                                           jac=True,
+                                           options={"gtol": tol,
+                                                    "maxiter": max_iter})
             if not opt_res.success:
                 warnings.warn("Optimization did not converge for lambda={}".format(lam_val))
-            preds[fn_vec==fn] = 1/(1+np.exp(-X_te.dot(coefs)))
-        if ps_mode=='fast':
-            ll_vec[i]=my_log_loss(y[fn_vec==0],preds[fn_vec==0])
+            preds[te] = expit(X_te.dot(opt_res.x))
+        if ps_mode == 'fast':
+            ll_vec[i] = my_log_loss(y[fn_vec == 0], preds[fn_vec == 0])
         else:
-            ll_vec[i]=my_log_loss(y,preds)
-    best_index = np.argmin(np.round(ll_vec,decimals=reg_prec))
+            ll_vec[i] = my_log_loss(y, preds)
+    best_index = np.argmin(np.round(ll_vec, decimals=reg_prec))
     best_lam_val = reg_param_vec[best_index]
-    best_loss = ll_vec[best_index]
-    if weightvec is not None:
-        opt_res = sp.optimize.minimize(pen_ll_fun_grad,
-                               start_coef_vec,
-                                (X_tr, y_tr,
-                                 best_lam_val, weightvec_tr),
-                                jac=True,
-                                options={"gtol": tol,
-                                "maxiter": max_iter})
-    else:
-        opt_res = sp.optimize.minimize(pen_ll_fun_grad,
-                               start_coef_vec,
-                                (X_tr, y_tr,
-                                 best_lam_val),
-                                jac=True,
-                                options={"gtol": tol,
-                                 "maxiter": max_iter})
+
+    # Final fit on all of the data
+    opt_res = sp.optimize.minimize(pen_ll_fun_grad,
+                                   start_coef_vec,
+                                   (X, y, float(best_lam_val), weightvec),
+                                   method=method,
+                                   jac=True,
+                                   options={"gtol": tol,
+                                            "maxiter": max_iter})
     if not opt_res.success:
         warn_str = """Optimization did not converge for final fit.
                     This is usually due to numerical issues.
