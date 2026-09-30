@@ -179,24 +179,36 @@ class SplineCalib(object):
         """Fit the calibrator given a set of predictions and truth values.
 
         This method will fit the calibrator. It handles both binary and
-        multiclass problems.
+        multiclass problems. The number of classes is inferred from the shape
+        of `y_model`.
 
         Parameters
         ----------
-        y_pred : array-like, shape (n_samples, n_classes)
-            Model outputs on which to perform calibration.
+        y_model : ndarray of shape (n_samples,) or (n_samples, n_classes)
+            Model outputs on which to perform calibration. Values are
+            probabilities in [0, 1].
 
-            If passed a 1-d array of length (n_samples) this will be presumed
-            to mean binary classification and the inputs presumed to be the
-            probability of class "1".
+            If passed a 1-d array of length `n_samples` this is presumed to
+            mean binary classification, and the values are presumed to be the
+            probability of class 1.
 
-            If passed a 2-d array, it is assumed to be a multiclass calibration
-            where the number of classes is n_classes.  Binary problems may
-            take 1-d or 2-d arrays as y_pred.
+            If passed a 2-d array with two columns, this is also a binary
+            problem and the second column is taken as the probability of
+            class 1. If it has more than two columns, this is a multiclass
+            calibration where the number of classes is `n_classes`.
 
-        y_true : array-like, shape (n_samples)
-            Truth values to calibrate against.  Values must be integers
-            between 0 and n_classes-1
+        y_true : array-like of shape (n_samples,)
+            Truth values to calibrate against. Values must be integers between
+            0 and `n_classes` - 1 (0 or 1 for a binary problem).
+
+        verbose : bool, default=False
+            If True, print progress messages while fitting.
+
+        Returns
+        -------
+        None
+            The fitted state is stored on the calibrator (for example
+            `knot_vec`, `basis_coef_vec` and `best_reg_param`).
         """
         if not isinstance(y_true, np.ndarray):
             y_true = np.array(y_true)
@@ -388,24 +400,30 @@ class SplineCalib(object):
         return np.unique(curr_knot_vec)
 
     def calibrate(self, y_in: FloatArray) -> FloatArray | None:
-        """Calibrates a set of predictions after being fit.
+        """Calibrate a set of predictions after being fit.
 
         This function returns calibrated probabilities after being
-        fit on a set of predictions and their true answers.  It handles
-        either binary and multiclass problems, depending on how it was fit.
+        fit on a set of predictions and their true answers. It handles
+        either binary or multiclass problems, depending on how it was fit.
 
         Parameters
         ----------
-        y_in : array-like, shape (n_samples, n_features)
-            The pre_calibrated scores.  For binary classification
-            can pass in a 1-d array representing the probability
-            of class 1.
+        y_in : ndarray of shape (n_samples,) or (n_samples, n_classes)
+            The uncalibrated probabilities, in the same layout that was used
+            for `fit`.
+
+            For a binary calibrator this can be a 1-d array of the
+            probability of class 1, or a 2-d array with two columns whose
+            second column is the probability of class 1. For a multiclass
+            calibrator it must be a 2-d array with `n_classes` columns.
 
         Returns
         -------
-        y_out : array, shape (n_samples, n_classes)
-            The calibrated probabilities: y_out will be returned
-            in the same shape as y_in.
+        y_out : ndarray or None
+            The calibrated probabilities, returned in the same shape as
+            `y_in`. For multiclass calibrators each row is renormalised to
+            sum to 1. If the calibrator has not been fit, a warning is issued
+            and None is returned.
         """
         y_in = y_in.astype(np.float64)
         if self.n_classes > 2:
