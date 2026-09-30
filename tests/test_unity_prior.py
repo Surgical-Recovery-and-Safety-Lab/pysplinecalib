@@ -1,10 +1,10 @@
 import os.path as op
 import numpy as np
 import pandas as pd
-import splinecalib as splc
+import pysplinecalib as splc
 from sklearn.metrics import roc_auc_score, log_loss
 
-data_path = op.join(splc.__path__[0], 'tests/data_for_tests')
+data_path = op.join(op.dirname(__file__), 'data_for_tests')
 
 
 def test_identity_calibration():
