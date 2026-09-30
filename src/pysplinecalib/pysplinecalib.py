@@ -146,7 +146,7 @@ class SplineCalib(object):
         self.reg_prec = reg_prec
         self.force_knot_endpts = force_knot_endpts
         self.logodds_scale = logodds_scale 
-        if type(logodds_eps==str) and (logodds_eps=='auto'):
+        if isinstance(logodds_eps, str) and (logodds_eps=='auto'):
             self.logodds_eps_auto = True
         else:
             self.logodds_eps = logodds_eps
