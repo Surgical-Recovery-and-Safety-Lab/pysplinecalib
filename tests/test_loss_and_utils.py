@@ -127,3 +127,15 @@ def test_logreg_cv_warns_when_not_converged():
     X, y = _cv_data()
     with pytest.warns(UserWarning, match="did not converge"):
         logreg_cv(X, y, 3, np.array([1e-3]), "L-BFGS-B", 1, 1e-12)
+
+
+def test_stratified_foldnums_reproducible_and_leaves_global_rng_alone():
+    y = np.array([0] * 20 + [1] * 20)
+    np.random.seed(123)
+    state = np.random.get_state()[1].copy()
+    a = get_stratified_foldnums(y, 4, random_state=7)
+    b = get_stratified_foldnums(y, 4, random_state=7)
+    c = get_stratified_foldnums(y, 4, random_state=8)
+    np.testing.assert_array_equal(a, b)
+    assert not np.array_equal(a, c)
+    np.testing.assert_array_equal(np.random.get_state()[1], state)

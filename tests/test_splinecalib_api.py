@@ -168,3 +168,50 @@ def test_plots(binary_data, multiclass_data):
         mc.show_calibration_curve()
     mc.show_spline_reg_plot(class_num=1)
     mc.show_calibration_curve(class_num=1)
+
+
+def test_single_column_input(binary_data):
+    p, y = binary_data
+    sc = SplineCalib(**FAST)
+    sc.fit(p, y)
+    out = sc.calibrate(p[:, None])
+    assert out.shape == p.shape
+    np.testing.assert_allclose(out, sc.calibrate(p))
+
+
+def test_unsupported_input_shape_raises(binary_data):
+    p, y = binary_data
+    sc = SplineCalib(**FAST)
+    sc.fit(p, y)
+    with pytest.raises(ValueError, match="got"):
+        sc.calibrate(np.ones((4, 3)))
+    with pytest.raises(ValueError, match="got"):
+        sc.calibrate(np.ones((2, 2, 2)))
+
+
+def test_knots_reproducible_and_random_state_respected(binary_data):
+    p, _ = binary_data
+    np.random.seed(5)
+    state = np.random.get_state()[1].copy()
+    a = SplineCalib(random_state=1, add_knots=None, **{**FAST})._get_knot_vec(p)
+    b = SplineCalib(random_state=1, add_knots=None, **{**FAST})._get_knot_vec(p)
+    c = SplineCalib(random_state=2, add_knots=None, **{**FAST})._get_knot_vec(p)
+    np.testing.assert_array_equal(a, b)
+    assert not np.array_equal(a, c)
+    np.testing.assert_array_equal(np.random.get_state()[1], state)
+
+
+def test_random_state_reaches_cv_folds(binary_data, monkeypatch):
+    import pysplinecalib.pysplinecalib as mod
+
+    seen = {}
+    real = mod.logreg_cv
+
+    def spy(*args, **kwargs):
+        seen.update(kwargs)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(mod, "logreg_cv", spy)
+    p, y = binary_data
+    SplineCalib(random_state=11, **FAST).fit(p, y)
+    assert seen["random_state"] == 11
