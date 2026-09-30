@@ -25,8 +25,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-  "Cython>=3.0.0",
   "pytest>=7.0.0",
+  "scikit-learn",
   "pytest-cov>=4.0.0",
   "ruff>=0.16.0",
 ]
