@@ -147,11 +147,10 @@ def get_stratified_foldnums(
 
     Assumes that y contains only integers between 0 and num_classes-1
     """
+    rng = np.random.default_rng(random_state)
     fn_vec = -1 * np.ones(len(y))
     for y_val in np.unique(y):
-        curr_yval_indices = np.where(y == y_val)[0]
-        np.random.seed(random_state)
-        np.random.shuffle(curr_yval_indices)
+        curr_yval_indices = rng.permutation(np.where(y == y_val)[0])
         index_indices = np.round(
             (len(curr_yval_indices) / num_folds) * np.arange(num_folds + 1)
         ).astype(int)

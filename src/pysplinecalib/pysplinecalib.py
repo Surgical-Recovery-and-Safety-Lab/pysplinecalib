@@ -1,4 +1,3 @@
-import random
 import warnings
 
 import matplotlib.pyplot as plt
@@ -353,7 +352,7 @@ class SplineCalib(object):
 
     def _get_knot_vec(self, y_model: FloatArray) -> FloatArray:
         """Routine to choose the set of knots."""
-        random.seed(self.random_state)
+        rng = np.random.default_rng(self.random_state)
         unique_vals = np.unique(y_model)
         num_unique = len(unique_vals)
         if num_unique < 3:
@@ -377,15 +376,13 @@ class SplineCalib(object):
         if num_unique > self.knot_sample_size:
             if self.force_knot_endpts:
                 smallest_knot, biggest_knot = unique_vals[0], unique_vals[-1]
-                other_vals = unique_vals[1:-1]
-                random.shuffle(other_vals)  # type: ignore[arg-type]
+                other_vals = rng.permutation(unique_vals[1:-1])
                 curr_knot_vec = other_vals[: (self.knot_sample_size - 2)]
                 curr_knot_vec = np.concatenate(
                     (curr_knot_vec, [smallest_knot, biggest_knot])
                 )
             else:
-                random.shuffle(unique_vals)  # type: ignore[arg-type]
-                curr_knot_vec = unique_vals[: self.knot_sample_size]
+                curr_knot_vec = rng.permutation(unique_vals)[: self.knot_sample_size]
 
         # use all the unique_vals
         else:
