@@ -1,4 +1,5 @@
 """Penalized logistic loss and gradient (pure NumPy/SciPy)."""
+
 import numpy as np
 from scipy.special import expit
 
