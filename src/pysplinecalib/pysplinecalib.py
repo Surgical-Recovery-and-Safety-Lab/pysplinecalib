@@ -3,8 +3,11 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 
 from .calib_utils import _natural_cubic_spline_basis_expansion, logreg_cv, my_logit
+
+FloatArray = NDArray[np.float64]
 
 
 class SplineCalib(object):
@@ -122,23 +125,23 @@ class SplineCalib(object):
 
     def __init__(
         self,
-        method="L-BFGS-B",
-        knot_sample_size=30,
-        add_knots="auto",
-        reg_param_vec="default",
-        cv_spline=5,
-        random_state=42,
-        unity_prior=True,
-        unity_prior_gridpts="default",
-        unity_prior_weight=20,
-        max_iter=1000,
-        tol=0.0001,
-        logodds_scale=True,
-        logodds_eps="auto",
-        reg_prec=4,
-        force_knot_endpts=True,
-        param_search_mode="fast",
-    ):
+        method: str = "L-BFGS-B",
+        knot_sample_size: int = 30,
+        add_knots: str | ArrayLike | None = "auto",
+        reg_param_vec: str | ArrayLike = "default",
+        cv_spline: int = 5,
+        random_state: int = 42,
+        unity_prior: bool = True,
+        unity_prior_gridpts: str | ArrayLike = "default",
+        unity_prior_weight: float = 20,
+        max_iter: int = 1000,
+        tol: float = 0.0001,
+        logodds_scale: bool = True,
+        logodds_eps: str | float = "auto",
+        reg_prec: int = 4,
+        force_knot_endpts: bool = True,
+        param_search_mode: str = "fast",
+    ) -> None:
         self.knot_sample_size = knot_sample_size
         self.add_knots = add_knots
         if (isinstance(self.add_knots, str)) and (self.add_knots == "auto"):
@@ -159,8 +162,9 @@ class SplineCalib(object):
         self.logodds_scale = logodds_scale
         if isinstance(logodds_eps, str) and (logodds_eps == "auto"):
             self.logodds_eps_auto = True
+            self.logodds_eps = 0.0001  # placeholder, chosen from data in `fit`
         else:
-            self.logodds_eps = logodds_eps
+            self.logodds_eps = float(logodds_eps)
             self.logodds_eps_auto = False
         self.method = method
         if param_search_mode in ["fast", "full"]:
@@ -169,7 +173,9 @@ class SplineCalib(object):
             warnings.warn('param_search_mode not understood, using "full"')
             self.param_search_mode = "full"
 
-    def fit(self, y_model, y_true, verbose=False):
+    def fit(
+        self, y_model: FloatArray, y_true: ArrayLike, verbose: bool = False
+    ) -> None:
         """Fit the calibrator given a set of predictions and truth values.
 
         This method will fit the calibrator. It handles both binary and
@@ -208,7 +214,9 @@ class SplineCalib(object):
                 y_model = y_model[:, 1]
             self._fit_binary(y_model, y_true, verbose=verbose)
 
-    def _fit_binary(self, y_model, y_true, verbose=False):
+    def _fit_binary(
+        self, y_model: FloatArray, y_true: FloatArray, verbose: bool = False
+    ) -> None:
 
         if verbose:
             print("Determining Calibration Function")
@@ -229,7 +237,9 @@ class SplineCalib(object):
                 self.unity_prior_weightvec = np.concatenate(
                     (1 / 18 * np.ones(18), np.ones(99), 1 / 18 * np.ones(18))
                 )
-                coda_wt = self.unity_prior_weight / np.sum(self.unity_prior_weightvec)
+                coda_wt = float(
+                    self.unity_prior_weight / np.sum(self.unity_prior_weightvec)
+                )
                 weightvec = np.concatenate(
                     (np.ones(len(y_model)), coda_wt * self.unity_prior_weightvec)
                 )
@@ -299,7 +309,9 @@ class SplineCalib(object):
         self.basis_coef_vec = reg.x
         self.opt_res = reg
 
-    def _fit_multiclass(self, y_model, y_true, verbose=False):
+    def _fit_multiclass(
+        self, y_model: FloatArray, y_true: FloatArray, verbose: bool = False
+    ) -> None:
         self.binary_splinecalibs = []
         for i in range(self.n_classes):
             if verbose:
@@ -327,7 +339,7 @@ class SplineCalib(object):
             )
             self.binary_splinecalibs[i].fit(y_model[:, i], (y_true == i).astype(int))
 
-    def _get_knot_vec(self, y_model):
+    def _get_knot_vec(self, y_model: FloatArray) -> FloatArray:
         """Routine to choose the set of knots."""
         random.seed(self.random_state)
         unique_vals = np.unique(y_model)
@@ -354,13 +366,13 @@ class SplineCalib(object):
             if self.force_knot_endpts:
                 smallest_knot, biggest_knot = unique_vals[0], unique_vals[-1]
                 other_vals = unique_vals[1:-1]
-                random.shuffle(other_vals)
+                random.shuffle(other_vals)  # type: ignore[arg-type]
                 curr_knot_vec = other_vals[: (self.knot_sample_size - 2)]
                 curr_knot_vec = np.concatenate(
                     (curr_knot_vec, [smallest_knot, biggest_knot])
                 )
             else:
-                random.shuffle(unique_vals)
+                random.shuffle(unique_vals)  # type: ignore[arg-type]
                 curr_knot_vec = unique_vals[: self.knot_sample_size]
 
         # use all the unique_vals
@@ -375,7 +387,7 @@ class SplineCalib(object):
         # Sort and remove duplicates
         return np.unique(curr_knot_vec)
 
-    def calibrate(self, y_in):
+    def calibrate(self, y_in: FloatArray) -> FloatArray | None:
         """Calibrates a set of predictions after being fit.
 
         This function returns calibrated probabilities after being
@@ -402,8 +414,9 @@ class SplineCalib(object):
             return self._calibrate_binary(y_in)
         else:
             warnings.warn("SplineCalib not fit or only one class found")
+            return None
 
-    def _calibrate_binary(self, y_in):
+    def _calibrate_binary(self, y_in: FloatArray) -> FloatArray:
         if len(y_in.shape) == 2:
             if y_in.shape[1] == 2:
                 y_in_to_use = y_in[:, 1]
@@ -431,14 +444,14 @@ class SplineCalib(object):
         y_out = np.vstack((1 - y_out, y_out)).T if two_col else y_out
         return y_out
 
-    def _calibrate_multiclass(self, y_in):
+    def _calibrate_multiclass(self, y_in: FloatArray) -> FloatArray:
         y_out = -1 * np.ones(y_in.shape)
         for i in range(self.n_classes):
             y_out[:, i] = self.binary_splinecalibs[i].calibrate(y_in[:, i])
         y_out = (y_out.T / (np.sum(y_out, axis=1))).T
         return y_out
 
-    def show_spline_reg_plot(self, class_num=None):
+    def show_spline_reg_plot(self, class_num: int | None = None) -> None:
         """Plot the cross-val loss against the regularization parameter.
 
         This is a diagnostic tool, for example, to indicate whether or
@@ -468,13 +481,13 @@ class SplineCalib(object):
 
     def show_calibration_curve(
         self,
-        class_num=None,
-        resolution=0.001,
-        show_baseline=True,
-        scaling="none",
-        scaling_base=10,
-        scaling_eps=0.0001,
-    ):
+        class_num: int | None = None,
+        resolution: float = 0.001,
+        show_baseline: bool = True,
+        scaling: str = "none",
+        scaling_base: float = 10,
+        scaling_eps: float = 0.0001,
+    ) -> None:
         """Plot the calibration curve as a function from [0,1] to [0,1].
 
         Parameters
@@ -503,13 +516,13 @@ class SplineCalib(object):
         tvec = np.unique(np.concatenate((tvec, avec, bvec)))
         if self.n_classes == 2:
             if scaling == "none":
-                plt.plot(tvec, self.calibrate(tvec))
+                plt.plot(tvec, self._calibrate_binary(tvec))
                 if show_baseline:
                     plt.plot(tvec, tvec, "k--")
-                plt.axis([-0.1, 1.1, -0.1, 1.1])
+                plt.axis((-0.1, 1.1, -0.1, 1.1))
             elif scaling == "logit":
                 tvec_to_plot = my_logit(tvec, base=scaling_base)
-                y_to_plot = my_logit(self.calibrate(tvec), base=scaling_base)
+                y_to_plot = my_logit(self._calibrate_binary(tvec), base=scaling_base)
                 plt.plot(tvec_to_plot, y_to_plot)
                 if show_baseline:
                     plt.plot(tvec_to_plot, tvec_to_plot, "k--")
@@ -528,19 +541,21 @@ class SplineCalib(object):
                 scaling_eps=scaling_eps,
             )
 
-    def transform(self, y_in):
+    def transform(self, y_in: FloatArray) -> FloatArray | None:
         """Alias for calibrate."""
         return self.calibrate(y_in)
 
-    def predict(self, y_in):
+    def predict(self, y_in: FloatArray) -> FloatArray | None:
         """Alias for calibrate."""
         return self.calibrate(y_in)
 
-    def predict_proba(self, y_in):
+    def predict_proba(self, y_in: FloatArray) -> FloatArray | None:
         """Alias for calibrate."""
         return self.calibrate(y_in)
 
-    def _compute_logodds_eps_from_data(self, y_model, logodds_eps_default=0.0001):
+    def _compute_logodds_eps_from_data(
+        self, y_model: FloatArray, logodds_eps_default: float = 0.0001
+    ) -> None:
         """Choose the logodds_eps value automatically."""
         y_model_loe = y_model[(y_model > 0) & (y_model < 1)]
         closest_to_zero = np.min(y_model_loe)

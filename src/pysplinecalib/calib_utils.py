@@ -1,18 +1,20 @@
 """Calibration of predicted probabilities."""
 
-from __future__ import division
-
 import warnings
+from typing import Any
 
 import numpy as np
-import scipy as sp
-import scipy.optimize  # noqa: F401
+import scipy.optimize
+from numpy.typing import ArrayLike, NDArray
+from scipy.optimize import OptimizeResult
 from scipy.special import expit
 
 from .loss_fun import pen_ll_fun_grad
 
 
-def _natural_cubic_spline_basis_expansion(xpts, knots):
+def _natural_cubic_spline_basis_expansion(
+    xpts: ArrayLike, knots: ArrayLike
+) -> NDArray[np.float64]:
     """Compute the natural cubic spline basis for points and knots.
 
     Parameters
@@ -42,18 +44,18 @@ def _natural_cubic_spline_basis_expansion(xpts, knots):
 
 
 def logreg_cv(
-    X,
-    y,
-    num_folds,
-    reg_param_vec,
-    method,
-    max_iter,
-    tol,
-    weightvec=None,
-    random_state=42,
-    reg_prec=4,
-    ps_mode="fast",
-):
+    X: NDArray[np.float64],
+    y: NDArray[np.float64],
+    num_folds: int,
+    reg_param_vec: NDArray[np.float64],
+    method: str,
+    max_iter: int,
+    tol: float,
+    weightvec: NDArray[np.float64] | None = None,
+    random_state: int = 42,
+    reg_prec: int = 4,
+    ps_mode: str = "fast",
+) -> tuple[float, NDArray[np.float64], OptimizeResult]:
     """Routine to find the best fitting penalized Logistic Regression.
 
     User must provide, the X, y, number of folds, range of `lambda` parameter
@@ -82,7 +84,7 @@ def logreg_cv(
 
     for i, lam_val in enumerate(reg_param_vec):
         for te, X_tr, y_tr, X_te, weightvec_tr in splits:
-            opt_res = sp.optimize.minimize(
+            opt_res = scipy.optimize.minimize(
                 pen_ll_fun_grad,
                 start_coef_vec,
                 (X_tr, y_tr, float(lam_val), weightvec_tr),
@@ -103,7 +105,7 @@ def logreg_cv(
     best_lam_val = reg_param_vec[best_index]
 
     # Final fit on all of the data
-    opt_res = sp.optimize.minimize(
+    opt_res = scipy.optimize.minimize(
         pen_ll_fun_grad,
         start_coef_vec,
         (X, y, float(best_lam_val), weightvec),
@@ -120,20 +122,27 @@ def logreg_cv(
     return (best_lam_val, ll_vec, opt_res)
 
 
-def my_logit(vec, base=np.exp(1), eps=1e-16):
+def my_logit(
+    vec: ArrayLike, base: float = np.exp(1), eps: float = 1e-16
+) -> NDArray[np.float64]:
     """Compute the logit of `vec` in the given log base, clipping to [eps, 1-eps]."""
-    vec = np.clip(vec, eps, 1 - eps)
-    return (1 / np.log(base)) * np.log(vec / (1 - vec))
+    clipped = np.clip(np.asarray(vec, dtype=np.float64), eps, 1 - eps)
+    result: NDArray[np.float64] = (1 / np.log(base)) * np.log(clipped / (1 - clipped))
+    return result
 
 
-def my_log_loss(truth_vec, pred_vec, eps=1e-16):
+def my_log_loss(
+    truth_vec: NDArray[np.float64], pred_vec: NDArray[np.float64], eps: float = 1e-16
+) -> float:
     """Compute the mean log loss, clipping predictions to [eps, 1-eps]."""
     pred_vec = np.clip(pred_vec, eps, 1 - eps)
     val = np.mean(truth_vec * np.log(pred_vec) + (1 - truth_vec) * np.log(1 - pred_vec))
-    return -val
+    return float(-val)
 
 
-def get_stratified_foldnums(y, num_folds, random_state=42):
+def get_stratified_foldnums(
+    y: NDArray[Any], num_folds: int, random_state: int = 42
+) -> NDArray[np.float64]:
     """Assign each data point of an outcome vector y to a stratified fold.
 
     Assumes that y contains only integers between 0 and num_classes-1
