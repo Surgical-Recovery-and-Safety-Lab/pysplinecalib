@@ -1,7 +1,6 @@
 [project]
 name = "pysplinecalib"
 description = "Fork of the splinecalib package by Brian Lucena"
-build-backend = "setuptools.build_meta"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -33,13 +32,7 @@ dev = [
 ]
 
 [build-system]
-requires = [
-  "Cython>=3.1.0b1",
-  "numpy>=2.0.0",
-  "scipy>=1.15",
-  "setuptools>=61.0",
-  "wheel",
-]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 # --- Type Checking Configuration ---
