@@ -1,0 +1,92 @@
+[project]
+name = "pysplinecalib"
+description = "Fork of the splinecalib package by Brian Lucena"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Mathias Roesler", email = "mathias.roesler@auckland.ac.nz" }]
+dynamic = ["version"]
+keywords = ["calibration", "classification", "machine-learning", "spline-based"]
+classifiers = [
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "matplotlib>=3.9",
+  "numpy>=2.1",
+  "scipy>=1.14",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.11",
+  "pandas>=2.2",
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.16.0",
+  "scikit-learn>=1.5",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# --- Type Checking Configuration ---
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+ignore_missing_imports = true
+
+# --- Testing Configuration ---
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+
+# --- Linter & Formatter Configuration ---
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "E",  # pycodestyle errors
+  "W",  # pycodestyle warnings
+  "F",  # pyflakes
+  "I",  # isort
+  "N",  # naming
+  "D",  # pydocstyle (docstring compliance)
+]
+ignore = [
+  "D100",  # Missing docstring in public module
+  "D104",  # Missing docstring in public package
+  "D205",  # 1 blank line required between summary and description: this
+  # codebase's convention is a flowing multi-line summary
+  # instead of numpydoc's strict one-line-summary split.
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.pep8-naming]
+# scikit-learn's own convention capitalizes the feature-matrix argument/
+# variable (X, X_arr, X_train, X_test, ...) to visually distinguish a 2D
+# matrix from a 1D target vector -- matching sklearn's public API (e.g.
+# fit(self, X, y)) rather than plain PEP 8. Allow that pattern, and the
+# handful of test names that spell it out in prose (test_fit_nan_in_X_...).
+extend-ignore-names = ["X", "X_*", "*_X_*"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pysplinecalib = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = { attr = "pysplinecalib.__version__" }

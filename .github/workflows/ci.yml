@@ -1,0 +1,35 @@
+name: Lint and build
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check src
+      - run: ruff format --check src
+      - run: mypy src
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - name: Install the wheel and import it
+        run: |
+          pip install dist/*.whl
+          cd "$RUNNER_TEMP"
+          python -c "import pysplinecalib; print(pysplinecalib.__version__)"
