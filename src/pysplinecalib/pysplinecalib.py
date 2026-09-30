@@ -229,7 +229,7 @@ class SplineCalib(object):
                 coda_wt = self.unity_prior_weight/num_wt_pts
                 self.unity_prior_weightvec = coda_wt * np.ones(num_wt_pts)
                 weightvec = np.concatenate((np.ones(len(y_model)), 
-                                        coda_wt * self.unity_prior_weightvec))
+                                        self.unity_prior_weightvec))
             self.final_weightvec = weightvec
             y_model = np.concatenate((y_model, self.unity_prior_gridpts))
             y_true = np.concatenate((y_true, self.unity_prior_gridpts))
@@ -302,7 +302,11 @@ class SplineCalib(object):
                             logodds_scale=self.logodds_scale,
                             unity_prior = self.unity_prior,
                             unity_prior_weight = self.unity_prior_weight,
-                            unity_prior_gridpts = self.unity_prior_gridpts))
+                            unity_prior_gridpts = self.unity_prior_gridpts,
+                            reg_prec = self.reg_prec,
+                            param_search_mode = self.param_search_mode,
+                            force_knot_endpts = self.force_knot_endpts,
+                            logodds_eps = le_auto))
             self.binary_splinecalibs[i].fit(y_model[:,i],
                                             (y_true==i).astype(int))
 
